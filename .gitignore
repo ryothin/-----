@@ -1,0 +1,8 @@
+.venv/
+venv/
+__pycache__/
+outputs/
+results/
+*.safetensors
+*.ckpt
+*.pth

@@ -1,0 +1,14 @@
+# --- 松尾方式 再現に必要なライブラリ ---
+# ★ torch だけは CUDA 版を公式サイトの指示で入れること（下の README 参照）。
+#   先に torch を入れてから、このファイルで残りを入れると安全。
+diffusers>=0.27
+transformers>=4.38
+accelerate>=0.27
+controlnet_aux>=0.0.7
+opencv-python
+pillow
+numpy
+lpips
+open_clip_torch
+pandas
+tqdm
