@@ -6,6 +6,8 @@ transformers>=4.38
 accelerate>=0.27
 controlnet_aux>=0.0.7
 opencv-python
+openpyxl
+flask
 pillow
 numpy
 lpips

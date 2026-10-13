@@ -1,2 +1,28 @@
 <!DOCTYPE html>
 <html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>符号化の結果</title>
+    
+</head>
+<body>
+    <h1>符号化の結果</h1>
+
+    <h2>プロンプト</h2>
+    <pre>{{prompt }}</pre>
+
+    <h2>ネガティブプロンプト</h2>
+    <pre>{{ negative_prompt}}</pre>
+
+    <h2>線画</h2>
+    <img src="{{ url_for('output_file', filename=lineart_image) }}" alt="線画" width="400">
+    <p>処理時間: {{total_time }} 秒</p>
+
+    <h2>Stable Difusionで再生成する</h2>
+    <form method="POST" action="/generate_with_controlnet">
+        <input type="hidden" name="lineart_filename" value="{{ lineart_image }}">
+        <button type = "submit">Stable Difusionで再生成する</button>
+    </form>
+</body>
+</html>
