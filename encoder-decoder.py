@@ -11,7 +11,6 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import torch
 import asyncio
-import aiohttp
 import re
 
 # ここからSDXL＋ControlNetのライブラリ読み込み
@@ -300,4 +299,4 @@ def get_generated_file(filename):
 
 # サーバーを起動する
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8000)
+    app.run(debug = True, use_reloader=False, host="127.0.0.1", port=5000)
