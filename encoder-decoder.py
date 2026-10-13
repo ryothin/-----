@@ -238,7 +238,66 @@ def extract_prompts_from_exif(image_path):
             prompt = prompt_match.group(1).strip() if prompt_match else "No Prompt found"
             negative_prompt = neg_prompt_match.group(1).strip() if neg_prompt_match else "No Negative Prompt found"
             return prompt, negative_prompt
+        
 
     except Exception as e:
         logging.error(f"EXIF解析エラー: {e}")
         return "No Prompt found", "No Negative Prompt found"
+
+@app.route("/generate_with_controlnet", methods=["POST"])
+def generate_with_controlnet():
+    # result.htmlからの線画ファイルを受け取る
+    lineart_filename = request.form.get("lineart_filename", None)
+    if not lineart_filename:
+        return jsonify({"error": "線画ファイル名が指定されていません。"}), 400
+
+    lineart_path = os.path.join(app.config["OUTPUT_FOLDER"], lineart_filename)
+    if not os.path.exists(lineart_path):
+        return jsonify({"error": "指定された線画ファイルが存在しません。"}), 400
+
+    #EXIFからプロンプトを読み戻す
+    prompt, negative_prompt = extract_prompts_from_exif(lineart_path)
+    logging.info(f"EXIFから取得した Prompt: {prompt}")
+
+    # 線画を制御画像(RGB)として開く
+    try:
+        control_image = Image.open(lineart_path).convert("RGB")
+    except Exception as e:
+        return jsonify({"error": f"画像を開く際にエラー: {e}"}), 500
+
+    # SDXLとControlNetで生成
+    try:
+        generated_images = pipe(
+            prompt = prompt,
+            negative_prompt = negative_prompt,
+            image = control_image,
+            num_inference_steps = 30,
+            guidance_scale = 7.5,
+        ).images
+
+        if len(generated_images) == 0:
+            return jsonify({"error": "画像生成に失敗しました。生成結果がありません。"}), 500
+
+        result_image = generated_images[0]
+        out_frame = f"generated_{lineart_filename}"
+        output_path = os.path.join(app.config["CONTROLNET_OUTPUT_FOLDER"], out_frame)
+        result_image.save(output_path, format="PNG")
+
+        return render_template(
+            "generate_result.html",
+            prompt = prompt,
+            negative_prompt = negative_prompt,
+            generated_images = out_frame,
+        )
+    except Exception as e:
+        logging.error(f"生成時にエラー: {e}")
+        return str(e), 500
+
+# 生成画像をブラウザに返すルート
+@app.route("/controlnet_outputs/<path:filename>")
+def get_generated_file(filename):
+    return send_from_directory(app.config["CONTROLNET_OUTPUT_FOLDER"], filename)
+
+# サーバーを起動する
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=8000)
