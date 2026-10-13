@@ -15,7 +15,7 @@ import aiohttp
 import re
 
 # ここからSDXL＋ControlNetのライブラリ読み込み
-from diffusers import ControlNetModel, StableDiffusionControlNetPipeline
+from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline
 
 # Flaskアプリケーションの設定
 app = Flask(__name__)
@@ -204,3 +204,41 @@ def index():
 @app.route("/outputs/<path:filename>")
 def output_file(filename):
     return send_from_directory(app.config["OUTPUT_FOLDER"], filename)
+
+# ========= 復号(生成)側：SDXL + ControlNet の読み込み =========
+base_model_id = "stabilityai/stable-diffusion-xl-base-1.0"
+controlnet_model_id = "diffusers/controlnet-canny-sdxl-1.0"   # SDXL用 canny ControlNet
+
+# GPUなら半精度(fp16)で軽く・速く、CPUなら32bit
+dtype = torch.float16 if device == "cuda" else torch.float32
+
+logging.info("Loading ControlNetModel...")
+controlnet = ControlNetModel.from_pretrained(controlnet_model_id, dtype=dtype).to(device)
+
+logging.info("Loading StableDiffusionXLControlNetPipeline...")
+pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
+    base_model_id,
+    controlnet=controlnet,
+    dtype=dtype,
+).to(device)
+
+def extract_prompts_from_exif(image_path):
+    try:
+        with Image.open(image_path) as img:
+            exif_data = img.getexif()
+            metadata_str = exif_data.get(0x9286, "")   # 関数6で書いた UserComment
+            if not metadata_str:
+                return "No Prompt found", "No Negative Prompt found"
+
+            # 「Prompt: ... Negative Prompt:」の間＝プロンプト
+            prompt_match = re.search(r"Prompt:\s*(.*?)\s*Negative Prompt:", metadata_str, re.DOTALL)
+            # 「Negative Prompt:」より後ろ＝ネガティブ
+            neg_prompt_match = re.search(r"Negative Prompt:\s*(.*)", metadata_str, re.DOTALL)
+
+            prompt = prompt_match.group(1).strip() if prompt_match else "No Prompt found"
+            negative_prompt = neg_prompt_match.group(1).strip() if neg_prompt_match else "No Negative Prompt found"
+            return prompt, negative_prompt
+
+    except Exception as e:
+        logging.error(f"EXIF解析エラー: {e}")
+        return "No Prompt found", "No Negative Prompt found"
