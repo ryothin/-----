@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDXL ControlNet Demo</title>
+</head>
+<body>
+<h1>画像をアップロードしてください</h1>
+
+<form method="POST" action="/" enctype="multipart/form-data">
+
+<p>画像ファイル</p>
+<input type = "file" name="image" accept="image/jpeg,image/png" required>
+
+<p>プロンプト</p>
+<textarea name="prompt" rows="3" cols="60"
+placeholder="a portrait of aman, realistic, detailed">
+</textarea>
+
+<p>ネガティブプロンプト</p>
+<textarea name ="negative_prompt" rows="2" cols="60"></textarea>
+
+<br></br>
+<button type="submit">アップロード</button>
+</form>
+</body>
+</html>
