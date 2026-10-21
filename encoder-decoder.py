@@ -228,7 +228,7 @@ pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
     dtype=dtype,
 )
 if device == "cuda":
-    pipe.eneble_model_cpu_offload() # 使う部品だけGPUに乗せ、使い終わったらCPUへ戻す
+    pipe.enable_model_cpu_offload() # 使う部品だけGPUに乗せ、使い終わったらCPUへ戻す
 else:
     pipe.to(device)
 
