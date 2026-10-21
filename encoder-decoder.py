@@ -71,6 +71,13 @@ def resize_image(image_path, target_pixels = 1024 * 1024):
         img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         img.save(image_path) # 元のファイルに上書き保存
 
+def calc_size(w, h, target_pixels=1024 * 1024, multiple=8):
+    """縦横比を保ったまま面積が約target_pixelsになるサイズを返す"""
+    scale = (target_pixels / (w * h)) ** 0.5
+    new_w = int(w * scale) // multiple * multiple
+    new_h = int(h * scale) // multiple * multiple
+    return new_w, new_h
+
 def check_image_format(image_path):
     """画像の形式をチェックする関数"""
     try:
@@ -219,7 +226,11 @@ pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
     base_model_id,
     controlnet=controlnet,
     dtype=dtype,
-).to(device)
+)
+if device == "cuda":
+    pipe.eneble_model_cpu_offload() # 使う部品だけGPUに乗せ、使い終わったらCPUへ戻す
+else:
+    pipe.to(device)
 
 def extract_prompts_from_exif(image_path):
     try:
@@ -263,21 +274,41 @@ def generate_with_controlnet():
     except Exception as e:
         return jsonify({"error": f"画像を開く際にエラー: {e}"}), 500
 
+    # （R1a）制御画像を縦横比そのまま約1MP(SDXLの学習解像度)へ拡大
+    orig_w, orig_h = control_image.size
+    W, H = calc_size(orig_w, orig_h)
+    control_image = control_image.resize((W, H), Image.Resampling.BICUBIC)
+    logging.info(f"制御画像サイズ: {orig_w}*{orig_h} -> {W}*{H}")
+
+    # (R1a)seedを固定（フォームになければ０）
+    seed = int(request.form.get("seed", 0))
+    generator = torch.Generator(device).manual_seed(seed)
+
     # SDXLとControlNetで生成
     try:
+        logging.info(f"UNet dtype: {pipe.unet.dtype}")
+        t0 = time.perf_counter()
         generated_images = pipe(
-            prompt = prompt,
-            negative_prompt = negative_prompt,
-            image = control_image,
-            num_inference_steps = 30,
-            guidance_scale = 7.5,
-        ).images
+            prompt = prompt, 
+            negative_prompt= negative_prompt,
+            image = control_image, 
+            width = W, 
+            height = H, 
+            num_inference_steps= 30, 
+            guidance_scale= 7.5, 
+            controlnet_conditioning_scale= 1.0,
+            generator = generator ,
+        ) .images
+        decode_time = time.perf_counter() - t0
+        logging.info(f"復号時間: {decode_time:.2f} s (seed={seed}, {W}*{H})")
+        
 
         if len(generated_images) == 0:
             return jsonify({"error": "画像生成に失敗しました。生成結果がありません。"}), 500
 
         result_image = generated_images[0]
-        out_frame = f"generated_{lineart_filename}"
+        stem = os.path.splitext(lineart_filename)[0]
+        out_frame = f"generated_{stem}_{W}x{H}_s{seed}.png"
         output_path = os.path.join(app.config["CONTROLNET_OUTPUT_FOLDER"], out_frame)
         result_image.save(output_path, format="PNG")
 
